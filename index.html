@@ -57,7 +57,7 @@
             var t0 = performance.now();
 
             Promise.allSettled(
-                new Array(6).fill(1).map((_, index) => {
+                new Array(1).fill(1).map((_, index) => {
                     var map = {
                         rs: () => ({ data: file, port: 8000 }),
                         py: () => {
@@ -119,7 +119,7 @@
             var t0 = performance.now();
             var file = fileInput.files[0];
             Promise.allSettled(
-                new Array(6).fill(1).map((_, i) => sendChunk(file, i)),
+                new Array(8).fill(1).map((_, i) => sendChunk(file, i)),
             )
             .then((_) => {
                 var res_time = (performance.now() - t0) / 1000;

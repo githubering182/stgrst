@@ -11,3 +11,9 @@ serde = "1.0.193"
 futures = "0.3"
 env_logger = "*"
 tokio-util = { version = "0.7.10", features = ["compat"] }
+
+
+#https://github.com/zip-rs/zip
+#https://github.com/geofmureithi/apalis/blob/master/packages/apalis-core/src/monitor.rs#L21https://github.com/geofmureithi/apalis/tree/master
+#https://github.com/jonhoo/faktory-rs
+#https://github.com/rusty-celery
