@@ -16,7 +16,7 @@ async fn main() -> std::io::Result<()> {
 
     let port: u16 = 8000;
 
-    println!("Running on port: {port}");
+    println!("Trying on port: {port}");
 
     HttpServer::new(move || {
         let cors = Cors::default()
