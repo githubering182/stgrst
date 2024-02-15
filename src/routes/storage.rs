@@ -1,8 +1,8 @@
 use crate::core::{DataBaseError, FileStream};
 use actix_web::{
-    error, get, post,
+    get, post,
     web::{Data, Path, Payload},
-    Error, HttpRequest, HttpResponse, Responder, ResponseError, Result,
+    HttpRequest, HttpResponse, Responder, ResponseError, Result,
 };
 use futures::{AsyncWriteExt, StreamExt};
 use mongodb::{
