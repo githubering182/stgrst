@@ -19,6 +19,3 @@ tracing-subscriber = "0.3.11"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
 # https://github.com/zip-rs/zip
-# https://github.com/geofmureithi/apalis
-# https://github.com/jonhoo/faktory-rs
-# https://github.com/rusty-celery
