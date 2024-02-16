@@ -1,6 +1,8 @@
 use crate::core::{DataBaseError, FileStream};
 use actix_web::{
-    get, post,
+    get,
+    http::header::ContentDisposition,
+    post,
     web::{Data, Path, Payload},
     HttpRequest, HttpResponse, Responder, ResponseError, Result,
 };
@@ -36,21 +38,20 @@ pub async fn upload(
         Err(_) => return Ok(HttpResponse::InternalServerError()),
     };
 
-    let mut chunk_data = Vec::new();
-    while let Some(chunk) = payload.next().await {
-        chunk_data.extend_from_slice(&chunk.unwrap());
-    }
-
     let mut upload_stream = bucket.open_upload_stream("filename", None);
 
-    upload_stream.write_all(&chunk_data).await?;
+    while let Some(chunk) = payload.next().await {
+        let chunk = chunk?;
+        upload_stream.write_all(&chunk).await?;
+    }
+
     upload_stream.close().await?;
 
     Ok(HttpResponse::Ok())
 }
 
 // TODO: rewrite to use results with ? operator
-#[get("/file/{type}/{file_id}")]
+#[get("/file/{type}/{file_id}/")]
 pub async fn retrieve(
     request: HttpRequest,
     database: Data<Arc<RwLock<Database>>>,
@@ -89,7 +90,9 @@ pub async fn retrieve(
         Err(_) => return Err(DataBaseError::NotFoundError),
     };
 
-    let stream = FileStream::new(file, download_stream, request);
+    let response = HttpResponse::Ok()
+        .append_header(ContentDisposition::attachment("some.zip"))
+        .streaming(FileStream::new(file, download_stream, request));
 
-    Ok(HttpResponse::Ok().streaming(stream))
+    Ok(response)
 }

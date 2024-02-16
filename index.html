@@ -22,6 +22,11 @@
                 style="border: 1px solid; width: 200px; height: 100px"
             ></div>
         </div>
+        <div>
+            <input id="downloadID" placeholder="download id" />
+            <button onclick="download(8000)">download 8k</button>
+            <button onclick="download(9000)">download 9k</button>
+        </div>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/axios@1.1.2/dist/axios.min.js"></script>
     <script>
@@ -45,6 +50,24 @@
             el.style.height = "100%";
 
             fileBox.replaceChildren(el);
+        };
+        var download = (port) => {
+            var val = downloadID.value;
+
+            if (!val) {
+                console.log("no val");
+                return;
+            }
+
+            console.log("downloading from: ", port);
+
+            var url = `http://localhost:${port}/file/arch/${val}/`;
+
+            var link = document.createElement("a");
+            link.href = url;
+            link.setAttribute("download", "some");
+            link.click();
+            link.remove();
         };
         var send = async (back) => {
             var file = fileInput.files[0];
@@ -120,8 +143,7 @@
             var file = fileInput.files[0];
             Promise.allSettled(
                 new Array(8).fill(1).map((_, i) => sendChunk(file, i)),
-            )
-            .then((_) => {
+            ).then((_) => {
                 var res_time = (performance.now() - t0) / 1000;
                 console.log("chuncked ", res_time.toFixed(3));
             });

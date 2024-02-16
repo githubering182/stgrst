@@ -82,15 +82,36 @@ impl Stream for FileStream {
             chunk_size => chunk_size,
         };
 
-        this.offset += read_size;
-
+        // TODO:
+        // appread that pending on read will give pending as output and as
+        // wrappers getting polled again it goes all over again
+        // maybe i can await for poll of reading w loop or something
+        // ex: loop {
+        //     match res.poll_unpin(cx) {
+        //         Poll::Pending => {
+        //             continue;
+        //         }
+        //         Poll::Ready(Err(e)) => {
+        //             return Poll::Ready(Some(Err(e)));
+        //         }
+        //         Poll::Ready(Ok(_)) => {
+        //             this.offset += read_size;
+        //             return Poll::Ready(Some(Ok(Bytes::from(buf))));
+        //         }
+        //     }
+        // }
+        // consider bffer allocation in other approach
         let mut buf = vec![0; read_size as usize];
+        // let mut buf = Vec::with_capacity(read_size as usize);
         let mut res = this.stream.read_exact(&mut buf);
 
         match res.poll_unpin(cx) {
             Poll::Pending => Poll::Pending,
-            Poll::Ready(Err(_)) => Poll::Ready(None),
-            Poll::Ready(Ok(_)) => Poll::Ready(Some(Ok(Bytes::from(buf)))),
+            Poll::Ready(Err(e)) => Poll::Ready(Some(Err(e))),
+            Poll::Ready(Ok(_)) => {
+                this.offset += read_size;
+                Poll::Ready(Some(Ok(Bytes::from(buf))))
+            }
         }
     }
 }

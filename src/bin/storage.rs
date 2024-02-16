@@ -5,6 +5,7 @@ use mongodb::Client;
 use std::sync::{Arc, RwLock};
 use storage::routes::*;
 
+// TODO: align bucket size
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     init_logger_from_env(Env::new().default_filter_or("info"));
