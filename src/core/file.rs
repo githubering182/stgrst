@@ -49,6 +49,7 @@ impl FileStream {
                         let parsed: Vec<&str> = h_data.unwrap().split("-").collect();
                         (
                             parsed[0].parse::<u64>().unwrap_or(0),
+                            // TODO: set chunk/global settings
                             parsed[1].parse::<u64>().unwrap_or(255 * 1024),
                         )
                     }

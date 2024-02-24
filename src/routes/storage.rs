@@ -17,13 +17,6 @@ use std::{
     sync::{Arc, RwLock},
 };
 
-#[get("/test")]
-pub async fn test(rq: HttpRequest) -> impl Responder {
-    let x = FileStream::parse_range(rq.headers(), 2014);
-    println!("rq hs: {:?}", x);
-    "ok"
-}
-
 // TODO: rewrite to use results with ? operator
 #[post("/file")]
 pub async fn upload(
@@ -35,7 +28,7 @@ pub async fn upload(
 
     let bucket = match database.read() {
         Ok(db) => db.gridfs_bucket(options),
-        Err(_) => return Ok(HttpResponse::InternalServerError()),
+        Err(_) => return Ok(HttpResponse::InternalServerError().finish()),
     };
 
     let mut upload_stream = bucket.open_upload_stream("filename", None);
@@ -47,7 +40,7 @@ pub async fn upload(
 
     upload_stream.close().await?;
 
-    Ok(HttpResponse::Ok())
+    Ok(HttpResponse::Created().body(upload_stream.id().to_string()))
 }
 
 // TODO: rewrite to use results with ? operator
