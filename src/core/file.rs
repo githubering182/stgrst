@@ -11,6 +11,7 @@ use std::{
     task::{Context, Poll},
 };
 
+// TODO: properly align struct fields
 pub struct FileStream {
     stream: GridFsDownloadStream,
     range: Range,
