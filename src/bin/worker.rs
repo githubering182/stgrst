@@ -10,6 +10,7 @@ async fn main() -> Result<()> {
 
     let broker = RedisStorage::connect("redis://127.0.0.1/").await?;
 
+    // TODO: new version released - check
     Monitor::new()
         .register_with_count(2, move |index| {
             WorkerBuilder::new(format!("StorageWroker-{index}"))

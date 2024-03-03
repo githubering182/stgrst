@@ -8,6 +8,7 @@ use storage::core::ArchiveJob;
 use storage::routes::*;
 
 // TODO: align bucket size and overall settings
+// handle unwrapping
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     init_logger_from_env(Env::new().default_filter_or("info"));

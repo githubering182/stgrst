@@ -1,10 +1,7 @@
-use actix_web::{
-    http::header::{HeaderMap, Range},
-    web::Bytes,
-    HttpRequest,
-};
+use super::_Range;
+use actix_web::web::Bytes;
 use futures::{AsyncReadExt, FutureExt, Stream};
-use mongodb::{gridfs::FilesCollectionDocument, GridFsDownloadStream};
+use mongodb::GridFsDownloadStream;
 use std::{
     io::Error,
     pin::Pin,
@@ -14,55 +11,19 @@ use std::{
 // TODO: properly align struct fields
 pub struct FileStream {
     stream: GridFsDownloadStream,
-    range: Range,
-    length: u64,
+    range: _Range,
     chunk_size: u64,
     offset: u64,
 }
 
 impl FileStream {
-    pub fn new(
-        file: FilesCollectionDocument,
-        stream: GridFsDownloadStream,
-        request: HttpRequest,
-    ) -> Self {
+    pub fn new(stream: GridFsDownloadStream, chunk_size: u32, range: _Range) -> Self {
         Self {
             stream,
-            range: FileStream::parse_range(request.headers(), file.length),
-            length: file.length,
-            chunk_size: file.chunk_size_bytes as u64,
+            range,
+            chunk_size: chunk_size as u64,
             offset: 0,
         }
-    }
-
-    pub fn parse_range(headers: &HeaderMap, file_length: u64) -> Range {
-        let (start, mut end) = match headers.get("range") {
-            None => (0, file_length),
-            Some(range) => {
-                let mut range_split = range.to_str().unwrap().split("=");
-                let h_type = range_split.next();
-                let h_data = range_split.next();
-
-                match h_type.is_none() || h_data.is_none() {
-                    true => (0, file_length),
-                    false if h_type.unwrap() != "bytes" => (0, file_length),
-                    _ => {
-                        let parsed: Vec<&str> = h_data.unwrap().split("-").collect();
-                        (
-                            parsed[0].parse::<u64>().unwrap_or(0),
-                            // TODO: set chunk/global settings
-                            parsed[1].parse::<u64>().unwrap_or(255 * 1024),
-                        )
-                    }
-                }
-            }
-        };
-
-        if end >= file_length {
-            end = file_length - 1;
-        }
-
-        Range::bytes(start, end)
     }
 }
 
@@ -72,18 +33,16 @@ impl Stream for FileStream {
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
 
-        if this.offset >= this.length {
+        if this.offset >= this.range.read_length {
             return Poll::Ready(None);
         }
 
         let read_size = match this.chunk_size {
-            chunk_size if chunk_size + this.offset > this.length => {
-                let chunk_size = this.length - this.offset;
-                chunk_size
+            chunk_size if chunk_size + this.offset > this.range.read_length => {
+                this.range.read_length - this.offset
             }
             chunk_size => chunk_size,
         };
-
         // TODO:
         // appread that pending on read will give pending as output and as
         // wrappers getting polled again it goes all over again
