@@ -3,26 +3,22 @@ use actix_web::{middleware::Logger, web::Data, App, HttpServer};
 use apalis::redis::RedisStorage;
 use env_logger::{init_from_env as init_logger_from_env, Env};
 use mongodb::Client;
-use std::sync::{Arc, Mutex, RwLock};
-use storage::core::ArchiveJob;
-use storage::routes::*;
+use std::io::Result;
+use storage::{core::ArchiveJob, routes::*};
 
 // TODO: align bucket size and overall settings
 // handle unwrapping
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> Result<()> {
     init_logger_from_env(Env::new().default_filter_or("info"));
+    let port: u16 = 8000;
 
-    let client = Client::with_uri_str("mongodb://localhost:27017")
+    let mongo = Client::with_uri_str("mongodb://localhost:27017")
         .await
         .unwrap();
-    let database = Arc::new(RwLock::new(client.database("storage_rs")));
     let redis = RedisStorage::<ArchiveJob>::connect("redis://127.0.0.1/")
         .await
         .unwrap();
-    let broker = Arc::new(Mutex::new(redis));
-
-    let port: u16 = 8000;
 
     println!("Trying on port: {port}");
 
@@ -37,8 +33,8 @@ async fn main() -> std::io::Result<()> {
             ])
             .allowed_methods(vec!["GET", "POST", "PUT", "DELETE"]);
         App::new()
-            .app_data(Data::new(database.clone()))
-            .app_data(Data::new(broker.clone()))
+            .app_data(Data::new(mongo.clone()))
+            .app_data(Data::new(redis.clone()))
             .wrap(Logger::default())
             .wrap(cors)
             .service(upload)

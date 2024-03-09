@@ -1,12 +1,12 @@
+use serde::Deserialize;
+
 mod storage;
 mod task;
 
-use serde::Deserialize;
+pub use storage::{retrieve, upload};
+pub use task::produce;
 
 #[derive(Deserialize, Debug)]
 struct RetrieveQuery {
     archive: Option<bool>,
 }
-
-pub use storage::{retrieve, upload};
-pub use task::produce;

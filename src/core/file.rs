@@ -1,7 +1,7 @@
-use super::_Range;
+use super::Range;
 use actix_web::web::Bytes;
 use futures::{AsyncReadExt, FutureExt, Stream};
-use mongodb::GridFsDownloadStream;
+use mongodb::{gridfs::FilesCollectionDocument, GridFsDownloadStream};
 use std::{
     io::Error,
     pin::Pin,
@@ -11,17 +11,19 @@ use std::{
 // TODO: properly align struct fields
 pub struct FileStream {
     stream: GridFsDownloadStream,
-    range: _Range,
+    pub range: Range,
+    pub file_name: String,
     chunk_size: u64,
     offset: u64,
 }
 
 impl FileStream {
-    pub fn new(stream: GridFsDownloadStream, chunk_size: u32, range: _Range) -> Self {
+    pub fn new(stream: GridFsDownloadStream, file: FilesCollectionDocument, range: Range) -> Self {
         Self {
             stream,
             range,
-            chunk_size: chunk_size as u64,
+            file_name: file.filename.unwrap_or(String::from("no_name")),
+            chunk_size: file.chunk_size_bytes as u64,
             offset: 0,
         }
     }

@@ -5,22 +5,18 @@ use actix_web::{
     HttpResponse, Responder, ResponseError, Result,
 };
 use apalis::{prelude::Storage, redis::RedisStorage};
-use std::sync::{Arc, Mutex};
 
-#[get("/archive/{message}")]
+#[get("/archive/{message}/")]
 pub async fn produce(
     path: Path<String>,
-    broker: Data<Arc<Mutex<RedisStorage<ArchiveJob>>>>,
+    broker: Data<RedisStorage<ArchiveJob>>,
 ) -> Result<impl Responder, impl ResponseError> {
-    let job_id = match broker.lock() {
-        Ok(mut b) => {
-            b.push(ArchiveJob {
-                task: path.into_inner(),
-            })
-            .await
-        }
-        Err(_) => return Err(JobError::ConnectionError),
+    let broker = &*broker.into_inner();
+
+    let job = ArchiveJob {
+        task: path.into_inner(),
     };
+    let job_id = broker.clone().push(job).await;
 
     match job_id {
         Ok(job_id) => Ok(HttpResponse::Created().body(job_id.to_string())),
