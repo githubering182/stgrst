@@ -22,6 +22,8 @@ impl BucketService {
         let mut options = GridFsBucketOptions::default();
         options.bucket_name = Some(bucket_name);
 
+        // TODO: find out what happes here. will several coroutines use
+        // same connection and is it blocking for each other?
         let bucket = db.database("storage_rs").gridfs_bucket(options);
 
         Self { bucket }

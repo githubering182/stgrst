@@ -1,4 +1,4 @@
-use apalis::prelude::{Job, JobContext, JobId};
+use apalis::prelude::{Job, JobContext};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]

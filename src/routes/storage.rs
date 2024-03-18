@@ -2,7 +2,7 @@ use super::RetrieveQuery;
 use crate::{core::DataBaseError, services::BucketService};
 use actix_web::{
     get,
-    http::header::{ContentDisposition, ContentRange, ContentRangeSpec, ACCEPT_RANGES},
+    http::header::{ContentDisposition, ContentRange, ContentRangeSpec},
     post,
     web::{Data, Path, Payload, Query},
     HttpRequest, HttpResponse, Responder, ResponseError, Result,
@@ -35,7 +35,7 @@ pub async fn retrieve(
     let bucket = BucketService::new(database, bucket_name);
     let stream = bucket.retrieve(request.headers(), file_id).await?;
 
-    let mut response = HttpResponse::Ok();
+    let mut response = HttpResponse::PartialContent();
     match archive_query.archive {
         Some(archive) if archive => {
             response.append_header(ContentDisposition::attachment(stream.file_name.clone()));
