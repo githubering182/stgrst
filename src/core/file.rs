@@ -1,6 +1,6 @@
 use super::Range;
 use actix_web::web::Bytes;
-use futures::{io::ReadExact, AsyncReadExt, FutureExt, Stream};
+use futures::{AsyncReadExt, FutureExt, Stream};
 use mongodb::{gridfs::FilesCollectionDocument, GridFsDownloadStream};
 use std::{
     io::Error,
