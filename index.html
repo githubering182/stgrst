@@ -45,7 +45,7 @@
             console.log("getting ", type, port);
 
             var el = document.createElement(type);
-            el.src = `http://localhost:${port}/file/${type}/${val}`;
+            el.src = `http://localhost:${port}/file/some_bucket/${val}/`;
             el.style.width = "100%";
             el.style.height = "100%";
 
@@ -91,18 +91,22 @@
                     };
                     var { port, data } = map[back]();
 
-                    return axios.post(`http://localhost:${port}/file`, data, {
-                        headers: { "Content-Type": "multipart/form-data" },
-                        onUploadProgress: (progressEvent) => {
-                            const percentCompleted = Math.round(
-                                (progressEvent.loaded * 100) /
-                                    progressEvent.total,
-                            );
-                            console.log(
-                                `${back}/${index} progress: ${percentCompleted}%`,
-                            );
+                    return axios.post(
+                        `http://localhost:${port}/file/some_bucket/`,
+                        data,
+                        {
+                            headers: { "Content-Type": "multipart/form-data" },
+                            onUploadProgress: (progressEvent) => {
+                                const percentCompleted = Math.round(
+                                    (progressEvent.loaded * 100) /
+                                        progressEvent.total,
+                                );
+                                console.log(
+                                    `${back}/${index} progress: ${percentCompleted}%`,
+                                );
+                            },
                         },
-                    });
+                    );
                 }),
             ).then(() => {
                 var res_time = (performance.now() - t0) / 1000;

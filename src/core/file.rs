@@ -46,7 +46,7 @@ impl Stream for FileStream {
             chunk_size => chunk_size,
         };
 
-        let mut buffer = Vec::with_capacity(read_size as usize);
+        let mut buffer = vec![0; read_size as usize];
         let mut reader = this.stream.read_exact(&mut buffer);
 
         match reader.poll_unpin(cx) {
