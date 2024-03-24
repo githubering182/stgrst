@@ -2,7 +2,7 @@ use super::RetrieveQuery;
 use crate::{core::DataBaseError, services::BucketService};
 use actix_web::{
     get,
-    http::header::{ContentDisposition, ContentLength, ContentRange, ContentRangeSpec},
+    http::header::{ContentDisposition, ContentRange, ContentRangeSpec},
     post,
     web::{Data, Path, Payload, Query},
     HttpRequest, HttpResponse, Responder, ResponseError, Result,
@@ -50,4 +50,9 @@ pub async fn retrieve(
     }
 
     Ok::<HttpResponse, DataBaseError>(response.streaming(stream))
+}
+
+#[post("/test")]
+pub async fn test() -> impl Responder {
+    return "ok";
 }

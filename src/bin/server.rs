@@ -40,6 +40,7 @@ async fn main() -> Result<()> {
             .service(upload)
             .service(retrieve)
             .service(produce)
+            .service(test)
     })
     .workers(4)
     .bind(("127.0.0.1", port))?

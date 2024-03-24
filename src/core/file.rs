@@ -1,7 +1,9 @@
 use super::Range;
 use actix_web::web::Bytes;
+use futures::io::ReadExact;
 use futures::{AsyncReadExt, FutureExt, Stream};
 use mongodb::{gridfs::FilesCollectionDocument, GridFsDownloadStream};
+use std::rc::Rc;
 use std::{
     io::Error,
     pin::Pin,
@@ -14,7 +16,8 @@ pub struct FileStream {
     pub range: Range,
     pub file_name: String,
     chunk_size: u64,
-    offset: u64,
+    poll: Option<ReadExact<'static, GridFsDownloadStream>>,
+    buffer: Rc<Vec<u8>>,
 }
 
 impl FileStream {
@@ -24,7 +27,8 @@ impl FileStream {
             range,
             file_name: file.filename.unwrap_or(String::from("no_name")),
             chunk_size: file.chunk_size_bytes as u64,
-            offset: 0,
+            poll: None,
+            buffer: Rc::new(Vec::with_capacity(file.chunk_size_bytes as usize)),
         }
     }
 }
@@ -35,26 +39,19 @@ impl Stream for FileStream {
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let this = self.get_mut();
 
-        if this.offset >= this.range.read_length {
-            return Poll::Ready(None);
-        }
+        let mut buffer = vec![0; this.chunk_size as usize];
+        let mut poll = this.stream.read(&mut buffer);
 
-        let read_size = match this.chunk_size {
-            chunk_size if chunk_size + this.offset > this.range.read_length => {
-                this.range.read_length - this.offset
-            }
-            chunk_size => chunk_size,
-        };
-
-        let mut buffer = vec![0; read_size as usize];
-        let mut reader = this.stream.read_exact(&mut buffer);
-
-        match reader.poll_unpin(cx) {
-            Poll::Pending => Poll::Pending,
-            Poll::Ready(Err(e)) => Poll::Ready(Some(Err(e))),
-            Poll::Ready(Ok(_)) => {
-                this.offset += read_size;
-                Poll::Ready(Some(Ok(Bytes::from(buffer))))
+        // TODO: dont forget to do something with blocking
+        loop {
+            match poll.poll_unpin(cx) {
+                Poll::Pending => continue,
+                Poll::Ready(Err(e)) => return Poll::Ready(Some(Err(e))),
+                Poll::Ready(Ok(0)) => return Poll::Ready(None),
+                Poll::Ready(Ok(read)) => {
+                    buffer.truncate(read);
+                    return Poll::Ready(Some(Ok(Bytes::from(buffer))));
+                }
             }
         }
     }

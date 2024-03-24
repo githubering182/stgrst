@@ -108,7 +108,8 @@
                         },
                     );
                 }),
-            ).then(() => {
+            ).then((d) => {
+                for (let x of d) console.log(x.value.data);
                 var res_time = (performance.now() - t0) / 1000;
                 console.log(back, res_time.toFixed(3));
             });
