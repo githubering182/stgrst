@@ -1,80 +1,85 @@
-use crate::core::{DataBaseError, FileStream, Range};
-use actix_web::{
-    http::header::HeaderMap,
-    web::{Data, Payload},
-    Result,
-};
-use futures::{AsyncWriteExt, StreamExt};
+use futures::AsyncWriteExt;
+use md5::{Digest, Md5};
 use mongodb::{
     bson::{doc, oid::ObjectId, Bson},
     options::GridFsBucketOptions,
-    Client, GridFsBucket,
+    Client, GridFsBucket, GridFsDownloadStream,
 };
+use rocket::{
+    data::ToByteUnit,
+    http::ContentType,
+    response::stream::{One, ReaderStream},
+    tokio::io::AsyncReadExt,
+    Data, State,
+};
+use std::io::Result;
 use std::str::FromStr;
+use tokio_util::compat::{Compat, FuturesAsyncReadCompatExt};
 
 pub struct BucketService {
     bucket: GridFsBucket,
+    read_size: usize,
 }
 
 // TODO: impl bucket realease with closing?
 impl BucketService {
-    pub fn new(db: Data<Client>, bucket_name: String) -> Self {
+    pub fn new(db: &State<Client>, bucket_name: &str) -> Self {
         let mut options = GridFsBucketOptions::default();
-        options.bucket_name = Some(bucket_name);
+        options.bucket_name = Some(bucket_name.to_owned());
 
         // TODO: find out what happes here. will several coroutines use
         // same connection and is it blocking for each other?
         let bucket = db.database("storage_rs").gridfs_bucket(options);
 
-        Self { bucket }
+        Self {
+            bucket,
+            read_size: 512 * 1024,
+        }
     }
 
-    pub async fn upload(&self, mut payload: Payload) -> Result<String> {
+    pub async fn upload(&self, data: Data<'_>) -> Result<String> {
         let mut upload_stream = self.bucket.open_upload_stream("filename", None);
 
-        while let Some(chunk) = payload.next().await {
-            let chunk = chunk?;
-            upload_stream.write_all(&chunk).await?;
+        let mut stream = data.open(10.gigabytes());
+        let mut buffer = vec![0; self.read_size];
+        let mut hasher = Md5::new();
+
+        loop {
+            match stream.read(&mut buffer).await {
+                Ok(0) => break,
+                Ok(read) if read < self.read_size => buffer.truncate(read),
+                _ => (),
+            }
+
+            upload_stream.write_all(&buffer).await.unwrap();
+            hasher.update(&buffer);
         }
 
-        upload_stream.close().await?;
+        let _file_hash = hasher.finalize();
+
+        upload_stream.close().await.unwrap();
 
         Ok(upload_stream.id().to_string())
     }
 
     pub async fn retrieve(
         &self,
-        headers: &HeaderMap,
-        file_id: String,
-    ) -> Result<FileStream, DataBaseError> {
-        let obj_id = match ObjectId::from_str(&file_id) {
-            Ok(obj_id) => obj_id,
-            Err(_) => return Err(DataBaseError::InternalError),
-        };
+        file_id: &str,
+    ) -> (ContentType, ReaderStream<One<Compat<GridFsDownloadStream>>>) {
+        let obj_id = ObjectId::from_str(file_id).unwrap();
         let cursor = self.bucket.find(doc! {"_id": obj_id}, None).await;
 
-        let file = match cursor {
-            Ok(mut cursor) => {
-                if let Some(file) = cursor.next().await {
-                    file.unwrap()
-                } else {
-                    return Err(DataBaseError::NotFoundError);
-                }
-            }
-            Err(_) => return Err(DataBaseError::NotFoundError),
-        };
+        let _file = cursor.unwrap();
 
-        let range = Range::new(headers, file.length);
-
-        let download_stream = match self
+        let download_stream = self
             .bucket
             .open_download_stream(Bson::ObjectId(obj_id))
             .await
-        {
-            Ok(download_stream) => download_stream,
-            Err(_) => return Err(DataBaseError::NotFoundError),
-        };
+            .unwrap();
 
-        Ok(FileStream::new(download_stream, file, range))
+        (
+            ContentType::MP4,
+            ReaderStream::one(download_stream.compat()),
+        )
     }
 }

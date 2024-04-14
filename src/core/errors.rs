@@ -1,4 +1,3 @@
-use actix_web::{error::ResponseError, http::StatusCode, HttpResponse};
 use derive_more::{Display, Error};
 
 #[derive(Debug, Display, Error)]
@@ -11,19 +10,6 @@ pub enum DataBaseError {
     NotFoundError,
 }
 
-impl ResponseError for DataBaseError {
-    fn error_response(&self) -> HttpResponse {
-        HttpResponse::build(self.status_code()).body(self.to_string())
-    }
-    fn status_code(&self) -> StatusCode {
-        match *self {
-            DataBaseError::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
-            DataBaseError::ConnectionError => StatusCode::INTERNAL_SERVER_ERROR,
-            DataBaseError::NotFoundError => StatusCode::NOT_FOUND,
-        }
-    }
-}
-
 #[derive(Debug, Display, Error)]
 pub enum JobError {
     #[display(fmt = "Job Internal Error")]
@@ -34,15 +20,28 @@ pub enum JobError {
     TaskFailed,
 }
 
-impl ResponseError for JobError {
-    fn error_response(&self) -> HttpResponse {
-        HttpResponse::build(self.status_code()).body(self.to_string())
-    }
-    fn status_code(&self) -> StatusCode {
-        match *self {
-            JobError::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
-            JobError::ConnectionError => StatusCode::INTERNAL_SERVER_ERROR,
-            JobError::TaskFailed => StatusCode::INTERNAL_SERVER_ERROR,
-        }
-    }
-}
+// impl ResponseError for DataBaseError {
+//     fn error_response(&self) -> HttpResponse {
+//         HttpResponse::build(self.status_code()).body(self.to_string())
+//     }
+//     fn status_code(&self) -> StatusCode {
+//         match *self {
+//             DataBaseError::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
+//             DataBaseError::ConnectionError => StatusCode::INTERNAL_SERVER_ERROR,
+//             DataBaseError::NotFoundError => StatusCode::NOT_FOUND,
+//         }
+//     }
+// }
+
+// impl ResponseError for JobError {
+//     fn error_response(&self) -> HttpResponse {
+//         HttpResponse::build(self.status_code()).body(self.to_string())
+//     }
+//     fn status_code(&self) -> StatusCode {
+//         match *self {
+//             JobError::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
+//             JobError::ConnectionError => StatusCode::INTERNAL_SERVER_ERROR,
+//             JobError::TaskFailed => StatusCode::INTERNAL_SERVER_ERROR,
+//         }
+//     }
+// }

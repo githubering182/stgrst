@@ -4,18 +4,17 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-mongodb = "2.8.0"
-actix-web = "4.4.1"
-actix-cors = "0.6.5"
-serde = "1.0.193"
-futures = "0.3"
-env_logger = "0.11.2"
+futures = "0.3.30"
+md-5 = "0.10.6"
+mongodb = "2.8.2"
+rocket = "0.5.0"
+rocket_cors = "0.6.0"
 tokio-util = { version = "0.7.10", features = ["compat"] }
-derive_more = "0.99.17"
 apalis = { version = "0.4.9", features = ["redis"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+derive_more = "0.99.17"
+serde = "1.0.193"
 anyhow = "1"
-tracing-subscriber = "0.3.11"
-chrono = { version = "0.4", default-features = false, features = ["clock"] }
+env_logger = "0.11.2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 # https://github.com/zip-rs/zip

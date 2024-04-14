@@ -1,25 +1,19 @@
-use crate::core::{ArchiveJob, JobError};
-use actix_web::{
-    get,
-    web::{Data, Path},
-    HttpResponse, Responder, ResponseError, Result,
-};
+use crate::core::ArchiveJob;
 use apalis::{prelude::Storage, redis::RedisStorage};
+use rocket::{get, http::Status, State};
 
-#[get("/archive/{message}/")]
-pub async fn produce(
-    path: Path<String>,
-    broker: Data<RedisStorage<ArchiveJob>>,
-) -> Result<impl Responder, impl ResponseError> {
-    let broker = &*broker.into_inner();
-
+#[get("/<message>")]
+pub async fn produce(_broker: &State<RedisStorage<ArchiveJob>>, message: &str) -> (Status, String) {
     let job = ArchiveJob {
-        task: path.into_inner(),
+        task: message.to_owned(),
     };
-    let job_id = broker.clone().push(job).await;
-
-    match job_id {
-        Ok(job_id) => Ok(HttpResponse::Created().body(job_id.to_string())),
-        Err(_) => Err(JobError::InternalError),
-    }
+    let mut redis = RedisStorage::<ArchiveJob>::connect("redis://127.0.0.1/")
+        .await
+        .unwrap();
+    let job_id = redis.push(job).await.unwrap();
+    (Status::Created, job_id.to_string())
+    // match job_id {
+    //     Ok(job_id) => (Status::Created, job_id.to_string()),
+    //     Err(_) => (Status::BadRequest, JobError::InternalError),
+    // }
 }

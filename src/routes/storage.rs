@@ -1,58 +1,28 @@
-use super::RetrieveQuery;
-use crate::{core::DataBaseError, services::BucketService};
-use actix_web::{
+use crate::services::BucketService;
+use mongodb::{bson::doc, Client, GridFsDownloadStream};
+use rocket::{
     get,
-    http::header::{ContentDisposition, ContentRange, ContentRangeSpec},
+    http::{ContentType, Status},
     post,
-    web::{Data, Path, Payload, Query},
-    HttpRequest, HttpResponse, Responder, ResponseError, Result,
+    response::stream::{One, ReaderStream},
+    Data, State,
 };
-use mongodb::Client;
+use tokio_util::compat::Compat;
 
-#[post("/file/{bucket}/")]
-pub async fn upload(
-    path: Path<String>,
-    database: Data<Client>,
-    payload: Payload,
-) -> Result<impl Responder> {
-    let bucket_name = path.into_inner();
-
-    let bucket = BucketService::new(database, bucket_name);
-    let id = bucket.upload(payload).await?;
-
-    Ok(HttpResponse::Created().body(id))
+#[post("/<bucket_name>", data = "<data>")]
+pub async fn upload(db: &State<Client>, bucket_name: &str, data: Data<'_>) -> (Status, String) {
+    let result_id = BucketService::new(db, bucket_name)
+        .upload(data)
+        .await
+        .unwrap();
+    (Status::Created, result_id)
 }
 
-#[get("/file/{bucket}/{file_id}/")]
+#[get("/<bucket_name>/<file_id>")]
 pub async fn retrieve(
-    request: HttpRequest,
-    database: Data<Client>,
-    path: Path<(String, String)>,
-    archive_query: Query<RetrieveQuery>,
-) -> Result<impl Responder, impl ResponseError> {
-    let (bucket_name, file_id) = path.into_inner();
-
-    let bucket = BucketService::new(database, bucket_name);
-    let stream = bucket.retrieve(request.headers(), file_id).await?;
-
-    let mut response = HttpResponse::PartialContent();
-
-    match archive_query.archive {
-        Some(archive) if archive => {
-            response.append_header(ContentDisposition::attachment(stream.file_name.clone()));
-        }
-        _ => {
-            response.append_header(ContentRange(ContentRangeSpec::Bytes {
-                range: Some((stream.range.start, stream.range.end)),
-                instance_length: Some(stream.range.read_length),
-            }));
-        }
-    }
-
-    Ok::<HttpResponse, DataBaseError>(response.streaming(stream))
-}
-
-#[post("/test")]
-pub async fn test() -> impl Responder {
-    return "ok";
+    db: &State<Client>,
+    bucket_name: &str,
+    file_id: &str,
+) -> (ContentType, ReaderStream<One<Compat<GridFsDownloadStream>>>) {
+    BucketService::new(db, bucket_name).retrieve(file_id).await
 }
