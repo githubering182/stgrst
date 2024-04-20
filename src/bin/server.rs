@@ -1,6 +1,6 @@
 #[macro_use]
 extern crate rocket;
-use apalis::redis::RedisStorage;
+use apalis::redis::{connect, RedisStorage};
 use mongodb::Client;
 use rocket::{http::Method, Config, Error};
 use rocket_cors::{AllowedOrigins, CorsOptions};
@@ -11,9 +11,9 @@ async fn main() -> Result<(), Error> {
     let mongo = Client::with_uri_str("mongodb://localhost:27017")
         .await
         .unwrap();
-    let redis = RedisStorage::<ArchiveJob>::connect("redis://127.0.0.1/")
-        .await
-        .unwrap();
+
+    let redis_conn = connect("redis://127.0.0.1/").await.unwrap();
+    let redis = RedisStorage::<ArchiveJob>::new(redis_conn);
 
     let mut app_config = Config::default();
     let cors = CorsOptions::default()

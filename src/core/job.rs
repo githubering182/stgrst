@@ -1,4 +1,4 @@
-use apalis::prelude::{Job, JobContext};
+use apalis::prelude::Job;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -7,7 +7,7 @@ pub struct ArchiveJob {
 }
 
 impl ArchiveJob {
-    pub async fn handle_job(job: ArchiveJob, _ctx: JobContext) {
+    pub async fn handle_job(job: ArchiveJob) {
         println!("Recieved new job: {}", job.task);
     }
 }

@@ -1,5 +1,8 @@
 use crate::core::ArchiveJob;
-use apalis::{prelude::Storage, redis::RedisStorage};
+use apalis::{
+    prelude::Storage,
+    redis::{connect, RedisStorage},
+};
 use rocket::{get, http::Status, State};
 
 #[get("/<message>")]
@@ -7,9 +10,10 @@ pub async fn produce(_broker: &State<RedisStorage<ArchiveJob>>, message: &str) -
     let job = ArchiveJob {
         task: message.to_owned(),
     };
-    let mut redis = RedisStorage::<ArchiveJob>::connect("redis://127.0.0.1/")
-        .await
-        .unwrap();
+
+    let redis_conn = connect("redis://127.0.0.1/").await.unwrap();
+    let mut redis = RedisStorage::<ArchiveJob>::new(redis_conn);
+
     let job_id = redis.push(job).await.unwrap();
     (Status::Created, job_id.to_string())
     // match job_id {

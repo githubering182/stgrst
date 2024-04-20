@@ -1,4 +1,4 @@
-use crate::services::BucketService;
+use crate::{core::Range, services::BucketService};
 use mongodb::{bson::doc, Client, GridFsDownloadStream};
 use rocket::{
     get,
@@ -20,9 +20,12 @@ pub async fn upload(db: &State<Client>, bucket_name: &str, data: Data<'_>) -> (S
 
 #[get("/<bucket_name>/<file_id>")]
 pub async fn retrieve(
+    range: Range,
     db: &State<Client>,
     bucket_name: &str,
     file_id: &str,
 ) -> (ContentType, ReaderStream<One<Compat<GridFsDownloadStream>>>) {
-    BucketService::new(db, bucket_name).retrieve(file_id).await
+    BucketService::new(db, bucket_name)
+        .retrieve(range, file_id)
+        .await
 }

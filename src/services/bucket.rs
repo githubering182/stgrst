@@ -1,3 +1,4 @@
+use crate::core::Range;
 use futures::AsyncWriteExt;
 use md5::{Digest, Md5};
 use mongodb::{
@@ -64,6 +65,7 @@ impl BucketService {
 
     pub async fn retrieve(
         &self,
+        _range: Range,
         file_id: &str,
     ) -> (ContentType, ReaderStream<One<Compat<GridFsDownloadStream>>>) {
         let obj_id = ObjectId::from_str(file_id).unwrap();
