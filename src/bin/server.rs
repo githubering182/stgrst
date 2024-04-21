@@ -1,12 +1,10 @@
-#[macro_use]
-extern crate rocket;
 use apalis::redis::{connect, RedisStorage};
 use mongodb::Client;
-use rocket::{http::Method, Config, Error};
+use rocket::{custom as app, http::Method, main as rocket_main, routes, Config, Error};
 use rocket_cors::{AllowedOrigins, CorsOptions};
 use storage::{core::ArchiveJob, routes::*};
 
-#[rocket::main]
+#[rocket_main]
 async fn main() -> Result<(), Error> {
     let mongo = Client::with_uri_str("mongodb://localhost:27017")
         .await
@@ -29,7 +27,7 @@ async fn main() -> Result<(), Error> {
     app_config.port = 8000;
     app_config.workers = 1;
 
-    rocket::custom(app_config)
+    app(app_config)
         .manage(mongo)
         .manage(redis)
         .attach(cors.to_cors().unwrap())
