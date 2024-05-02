@@ -11,11 +11,10 @@ use tokio_util::compat::Compat;
 
 #[post("/<bucket_name>", data = "<data>")]
 pub async fn upload(db: &State<Client>, bucket_name: &str, data: Data<'_>) -> (Status, String) {
-    let result_id = BucketService::new(db, bucket_name)
-        .upload(data)
-        .await
-        .unwrap();
-    (Status::Created, result_id)
+    match BucketService::new(db, bucket_name).upload(data).await {
+        Err(message) => (Status::Conflict, message),
+        Ok(file_id) => (Status::Created, file_id),
+    }
 }
 
 #[get("/<bucket_name>/<file_id>")]

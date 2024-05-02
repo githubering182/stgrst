@@ -1,10 +1,10 @@
-use crate::core::Range;
+use crate::{core::Range, BUCKET_CHUNK_SIZE, MAX_STREAM_LENGTH, MONGO_DB_NAME};
 use futures::AsyncWriteExt;
 use md5::{Digest, Md5};
 use mongodb::{
-    bson::{doc, oid::ObjectId, Bson},
+    bson::{doc, oid::ObjectId, Bson, Document},
     options::GridFsBucketOptions,
-    Client, GridFsBucket, GridFsDownloadStream,
+    Client, Collection, Database, GridFsBucket, GridFsDownloadStream,
 };
 use rocket::{
     data::ToByteUnit,
@@ -13,36 +13,34 @@ use rocket::{
     tokio::io::AsyncReadExt,
     Data, State,
 };
-use std::io::Result;
 use std::str::FromStr;
 use tokio_util::compat::{Compat, FuturesAsyncReadCompatExt};
 
+// TODO: impl bucket realease with closing?
 pub struct BucketService {
-    bucket: GridFsBucket,
+    database: Database,
+    bucket_name: String,
     read_size: usize,
 }
 
-// TODO: impl bucket realease with closing?
 impl BucketService {
     pub fn new(db: &State<Client>, bucket_name: &str) -> Self {
-        let mut options = GridFsBucketOptions::default();
-        options.bucket_name = Some(bucket_name.to_owned());
-
-        // TODO: find out what happes here. will several coroutines use
-        // same connection and is it blocking for each other?
-        let bucket = db.database("storage_rs").gridfs_bucket(options);
+        let database = db.database(MONGO_DB_NAME);
 
         Self {
-            bucket,
-            read_size: 512 * 1024,
+            database,
+            bucket_name: bucket_name.into(),
+            read_size: BUCKET_CHUNK_SIZE,
         }
     }
 
-    pub async fn upload(&self, data: Data<'_>) -> Result<String> {
-        let mut upload_stream = self.bucket.open_upload_stream("filename", None);
+    pub async fn upload(&self, data: Data<'_>) -> Result<String, String> {
+        let bucket = self.bucket();
+        let collection = self.collection();
 
-        let mut stream = data.open(10.gigabytes());
         let mut buffer = vec![0; self.read_size];
+        let mut upload_stream = bucket.open_upload_stream("temp_file", None);
+        let mut stream = data.open(MAX_STREAM_LENGTH.gigabytes());
         let mut hasher = Md5::new();
 
         loop {
@@ -51,14 +49,32 @@ impl BucketService {
                 Ok(read) if read < self.read_size => buffer.truncate(read),
                 _ => (),
             }
-
-            upload_stream.write_all(&buffer).await.unwrap();
+            _ = upload_stream.write_all(&buffer).await;
             hasher.update(&buffer);
         }
 
-        let _file_hash = hasher.finalize();
+        _ = upload_stream.close().await;
 
-        upload_stream.close().await.unwrap();
+        let file_hash = hasher
+            .finalize()
+            .into_iter()
+            .map(|ch| ch.to_string())
+            .collect::<Vec<String>>()
+            .join("");
+
+        if self.search_by_hash(&file_hash).await.is_err() {
+            _ = upload_stream.abort().await;
+            _ = bucket.delete(upload_stream.id().clone()).await;
+            return Err("Such file already exists".to_string());
+        }
+
+        _ = collection
+            .update_one(
+                doc! { "_id": upload_stream.id() },
+                doc! { "$set": doc! {"metadata": file_hash} },
+                None,
+            )
+            .await;
 
         Ok(upload_stream.id().to_string())
     }
@@ -68,13 +84,13 @@ impl BucketService {
         _range: Range,
         file_id: &str,
     ) -> (ContentType, ReaderStream<One<Compat<GridFsDownloadStream>>>) {
+        let bucket = self.bucket();
         let obj_id = ObjectId::from_str(file_id).unwrap();
-        let cursor = self.bucket.find(doc! {"_id": obj_id}, None).await;
+        let cursor = bucket.find(doc! {"_id": obj_id}, None).await;
 
         let _file = cursor.unwrap();
 
-        let download_stream = self
-            .bucket
+        let download_stream = bucket
             .open_download_stream(Bson::ObjectId(obj_id))
             .await
             .unwrap();
@@ -83,5 +99,24 @@ impl BucketService {
             ContentType::MP4,
             ReaderStream::one(download_stream.compat()),
         )
+    }
+}
+
+impl BucketService {
+    async fn search_by_hash(&self, hash: &String) -> Result<(), ()> {
+        let bucket = self.bucket();
+        match bucket.find(doc! {"meta.hash": hash}, None).await {
+            Err(_) => Ok(()),
+            Ok(_) => Err(()),
+        }
+    }
+    fn bucket(&self) -> GridFsBucket {
+        let mut options = GridFsBucketOptions::default();
+        options.bucket_name = Some(self.bucket_name.clone());
+
+        self.database.gridfs_bucket(options)
+    }
+    fn collection(&self) -> Collection<Document> {
+        self.database.collection(self.bucket_name.as_str())
     }
 }
