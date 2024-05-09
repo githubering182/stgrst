@@ -1,4 +1,7 @@
-use crate::{core::Range, services::BucketService};
+use crate::{
+    core::{FileMeta, Range},
+    services::BucketService,
+};
 use mongodb::{bson::doc, Client, GridFsDownloadStream};
 use rocket::{
     get,
@@ -10,8 +13,13 @@ use rocket::{
 use tokio_util::compat::Compat;
 
 #[post("/<bucket_name>", data = "<data>")]
-pub async fn upload(db: &State<Client>, bucket_name: &str, data: Data<'_>) -> (Status, String) {
-    match BucketService::new(db, bucket_name).upload(data).await {
+pub async fn upload(
+    db: &State<Client>,
+    bucket_name: &str,
+    data: Data<'_>,
+    meta: FileMeta<'_>,
+) -> (Status, String) {
+    match BucketService::new(db, bucket_name).upload(data, meta).await {
         Err(message) => (Status::Conflict, message),
         Ok(file_id) => (Status::Created, file_id),
     }
@@ -27,4 +35,5 @@ pub async fn retrieve(
     BucketService::new(db, bucket_name)
         .retrieve(range, file_id)
         .await
+        .unwrap()
 }
