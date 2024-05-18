@@ -7,6 +7,7 @@ pub struct Range {
     pub start: u64,
     pub end: Option<u64>,
     pub read_length: Option<u64>,
+    pub partial: bool,
 }
 
 impl Range {
@@ -18,6 +19,7 @@ impl Range {
             start,
             end,
             read_length,
+            partial: start > 0,
         }
     }
 

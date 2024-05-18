@@ -1,8 +1,8 @@
 use crate::{
     core::{FileMeta, Range},
-    BUCKET_CHUNK_SIZE, MAX_STREAM_LENGTH, MONGO_DB_NAME,
+    BUCKET_CHUNK_SIZE, MAX_STREAM_LENGTH, MONGO_DB_NAME, SKIP_BUFFER_SIZE,
 };
-use futures::{AsyncWriteExt, StreamExt};
+use futures::{AsyncReadExt as FuturesAsyncRead, AsyncWriteExt, StreamExt};
 use md5::{Digest, Md5};
 use mongodb::{
     bson::{doc, oid::ObjectId, Bson, Document},
@@ -16,7 +16,7 @@ use rocket::{
     tokio::io::AsyncReadExt,
     Data, State,
 };
-use std::str::FromStr;
+use std::{cmp::min, str::FromStr};
 use tokio_util::compat::{Compat, FuturesAsyncReadCompatExt};
 
 // TODO: impl bucket realease with closing?
@@ -72,26 +72,53 @@ impl BucketService {
 
     pub async fn retrieve(
         &self,
-        _range: Range,
+        range: Range,
         file_id: &str,
     ) -> Result<(ContentType, ReaderStream<One<Compat<GridFsDownloadStream>>>), ()> {
         let bucket = self.bucket();
         let obj_id = ObjectId::from_str(file_id).unwrap();
-        let _file = bucket.find(doc! {"_id": obj_id}, None).await.unwrap();
-
-        let download_stream = bucket
-            .open_download_stream(Bson::ObjectId(obj_id))
+        let file = match bucket
+            .find(doc! {"_id": obj_id}, None)
             .await
-            .unwrap();
+            .unwrap()
+            .next()
+            .await
+        {
+            Some(file) => file.unwrap(),
+            None => unreachable!(),
+        };
 
-        Ok((
-            ContentType::MP4,
-            ReaderStream::one(download_stream.compat()),
-        ))
+        let mut download_stream = match bucket.open_download_stream(Bson::ObjectId(obj_id)).await {
+            Ok(stream) => stream,
+            Err(_) => unreachable!(),
+        };
+
+        if range.partial {
+            _ = self.skip_head(&mut download_stream, range.start).await;
+        }
+
+        let content_type = self.get_content_type(file.metadata.unwrap().get("extension"));
+
+        Ok((content_type, ReaderStream::one(download_stream.compat())))
     }
 }
 
 impl BucketService {
+    async fn skip_head(&self, stream: &mut GridFsDownloadStream, to: u64) -> Result<(), ()> {
+        let mut skip_buffer = vec![0; SKIP_BUFFER_SIZE];
+        let mut to = to as usize;
+
+        while to > 0 {
+            let read_size = min(to, SKIP_BUFFER_SIZE);
+            let read_result = stream.read_exact(&mut skip_buffer[..read_size]).await;
+            match read_result {
+                Ok(_) => to -= read_size,
+                Err(_) => return Err(()),
+            }
+        }
+        Ok(())
+    }
+
     async fn update_file<'r>(
         &self,
         file_id: &Bson,
@@ -145,5 +172,19 @@ impl BucketService {
     fn collection(&self) -> Collection<Document> {
         let bucket_files = self.bucket_name.to_owned() + ".files";
         self.database.collection(bucket_files.as_str())
+    }
+
+    fn get_content_type(&self, file_extensin: Option<&Bson>) -> ContentType {
+        match file_extensin {
+            Some(Bson::String(extension)) => match extension.to_lowercase().as_str() {
+                "mp4" => ContentType::MP4,
+                "mov" => ContentType::MOV,
+                "mpeg" | "mpg" => ContentType::MPEG,
+                "jpg" | "jpeg" => ContentType::JPEG,
+                "png" => ContentType::PNG,
+                _ => ContentType::Bytes,
+            },
+            _ => ContentType::Bytes,
+        }
     }
 }
