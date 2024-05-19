@@ -94,7 +94,9 @@ impl BucketService {
         };
 
         if range.partial {
-            _ = self.skip_head(&mut download_stream, range.start).await;
+            _ = self
+                .skip_head(&mut download_stream, range.start as usize)
+                .await;
         }
 
         let content_type = self.get_content_type(file.metadata.unwrap().get("extension"));
@@ -104,18 +106,17 @@ impl BucketService {
 }
 
 impl BucketService {
-    async fn skip_head(&self, stream: &mut GridFsDownloadStream, to: u64) -> Result<(), ()> {
+    async fn skip_head(&self, stream: &mut GridFsDownloadStream, mut to: usize) -> Result<(), ()> {
         let mut skip_buffer = vec![0; SKIP_BUFFER_SIZE];
-        let mut to = to as usize;
 
         while to > 0 {
             let read_size = min(to, SKIP_BUFFER_SIZE);
-            let read_result = stream.read_exact(&mut skip_buffer[..read_size]).await;
-            match read_result {
+            match stream.read_exact(&mut skip_buffer[..read_size]).await {
                 Ok(_) => to -= read_size,
                 Err(_) => return Err(()),
             }
         }
+
         Ok(())
     }
 
@@ -165,7 +166,6 @@ impl BucketService {
     fn bucket(&self) -> GridFsBucket {
         let mut options = GridFsBucketOptions::default();
         options.bucket_name = Some(self.bucket_name.clone());
-
         self.database.gridfs_bucket(options)
     }
 

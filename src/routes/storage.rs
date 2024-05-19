@@ -19,9 +19,10 @@ pub async fn upload(
     data: Data<'_>,
     meta: FileMeta<'_>,
 ) -> (Status, String) {
-    match BucketService::new(db, bucket_name).upload(data, meta).await {
-        Err(message) => (Status::Conflict, message),
+    let bucket_service = BucketService::new(db, bucket_name);
+    match bucket_service.upload(data, meta).await {
         Ok(file_id) => (Status::Created, file_id),
+        Err(message) => (Status::Conflict, message),
     }
 }
 
@@ -31,9 +32,13 @@ pub async fn retrieve(
     db: &State<Client>,
     bucket_name: &str,
     file_id: &str,
-) -> (ContentType, ReaderStream<One<Compat<GridFsDownloadStream>>>) {
-    BucketService::new(db, bucket_name)
-        .retrieve(range, file_id)
-        .await
-        .unwrap()
+) -> (
+    Status,
+    Option<(ContentType, ReaderStream<One<Compat<GridFsDownloadStream>>>)>,
+) {
+    let bucket_service = BucketService::new(db, bucket_name);
+    match bucket_service.retrieve(range, file_id).await {
+        Ok(result) => (Status::Ok, Some(result)),
+        Err(_) => (Status::NotFound, None),
+    }
 }
