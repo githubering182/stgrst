@@ -32,7 +32,7 @@ async fn main() -> Result<(), Error> {
         .manage(redis)
         .attach(cors.to_cors().unwrap())
         .mount("/storage/", routes![upload, retrieve])
-        .mount("/worker/", routes![produce])
+        .mount("/worker/", routes![produce_task, check_task])
         .launch()
         .await?;
 
